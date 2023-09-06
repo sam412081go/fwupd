@@ -633,6 +633,8 @@ fu_pxi_receiver_device_get_peripheral_info(FuPxiReceiverDevice *device,
 {
 	guint8 buf[FU_PXI_RECEIVER_DEVICE_OTA_BUF_SZ] = {0x0};
 	guint16 checksum = 0;
+	guint16 hpac_ver = 0;
+	g_autoptr(GByteArray) hpac_ver_buf = g_byte_array_new();
 	g_autofree gchar *version_str = NULL;
 	g_autoptr(GByteArray) ota_cmd = g_byte_array_new();
 	g_autoptr(GByteArray) receiver_device_cmd = g_byte_array_new();
@@ -697,7 +699,14 @@ fu_pxi_receiver_device_get_peripheral_info(FuPxiReceiverDevice *device,
 	/* set current version and model name */
 	model->checksum = checksum;
 	g_debug("checksum %x", model->checksum);
-	version_str = g_strndup((gchar *)model->version, 5);
+	if (!fu_device_has_private_flag(FU_DEVICE(device), FU_PXI_DEVICE_FLAG_IS_HPAC)) {
+		version_str = g_strndup((gchar *)model->version, 5);
+	} else {
+		if (!fu_memread_uint16_safe(model->version, 5, 3, &hpac_ver, G_BIG_ENDIAN, error))
+			return FALSE;
+		fu_pxi_hpac_version_info_parse(hpac_ver_buf, &hpac_ver);
+		version_str = g_strndup((gchar *)hpac_ver_buf->data, hpac_ver_buf->len);
+	}
 	g_debug("version_str %s", version_str);
 
 	return TRUE;
@@ -750,13 +759,23 @@ fu_pxi_receiver_device_add_peripherals(FuPxiReceiverDevice *device, guint idx, G
 {
 #ifdef HAVE_HIDRAW_H
 	struct ota_fw_dev_model model = {0x0};
+	guint16 hpac_ver = 0;
+	g_autoptr(GByteArray) hpac_ver_buf = g_byte_array_new();
 	g_autofree gchar *model_name = NULL;
 	g_autofree gchar *model_version = NULL;
 
 	/* get the all wireless peripherals info */
 	if (!fu_pxi_receiver_device_get_peripheral_info(device, &model, idx, error))
 		return FALSE;
-	model_version = g_strndup((gchar *)model.version, 5);
+	if (!fu_device_has_private_flag(FU_DEVICE(device), FU_PXI_DEVICE_FLAG_IS_HPAC)) {
+		model_version = g_strndup((gchar *)model.version, 5);
+	} else {
+		if (!fu_memread_uint16_safe(model.version, 5, 3, &hpac_ver, G_BIG_ENDIAN, error))
+			return FALSE;
+		fu_pxi_hpac_version_info_parse(hpac_ver_buf, &hpac_ver);
+		model_version = g_strndup((gchar *)hpac_ver_buf->data, hpac_ver_buf->len);
+	}
+
 	model_name = g_strndup((gchar *)model.name, FU_PXI_DEVICE_MODEL_NAME_LEN);
 
 	if (model.type == OTA_WIRELESS_MODULE_TYPE_RECEIVER) {

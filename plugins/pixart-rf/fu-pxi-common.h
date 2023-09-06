@@ -101,3 +101,5 @@ fu_pxi_ota_fw_state_parse(struct ota_fw_state *fwstate,
 			  gsize bufsz,
 			  gsize offset,
 			  GError **error);
+void
+fu_pxi_hpac_version_info_parse(GByteArray *hpac_ver_buf, const guint16 *hpac_ver);

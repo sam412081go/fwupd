@@ -124,3 +124,16 @@ fu_pxi_composite_receiver_cmd(guint8 opcode,
 	g_byte_array_prepend(wireless_mod_cmd, &rid, 0x01);
 	return TRUE;
 }
+
+void
+fu_pxi_hpac_version_info_parse(GByteArray *hpac_ver_buf, const guint16 *hpac_ver)
+{
+	fu_byte_array_append_uint8(hpac_ver_buf, '0' + (*hpac_ver / 10000));
+	fu_byte_array_append_uint8(hpac_ver_buf, '0' + ((*hpac_ver / 1000) % 10));
+	fu_byte_array_append_uint8(hpac_ver_buf, 0x2e);
+	fu_byte_array_append_uint8(hpac_ver_buf, '0' + ((*hpac_ver / 100) % 10));
+	fu_byte_array_append_uint8(hpac_ver_buf, '0' + ((*hpac_ver / 10) % 10));
+	fu_byte_array_append_uint8(hpac_ver_buf, 0x2e);
+	fu_byte_array_append_uint8(hpac_ver_buf, 0x30);
+	fu_byte_array_append_uint8(hpac_ver_buf, '0' + (*hpac_ver % 10));
+}

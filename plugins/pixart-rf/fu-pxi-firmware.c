@@ -12,6 +12,7 @@
 #define PIXART_RF_FW_HEADER_TAG_OFFSET 24
 /* The hpac header is start from 821st byte from the end */
 #define PIXART_RF_FW_HEADER_HPAC_POS_FROM_END 821
+#define PIXART_RF_FW_HEADER_HPAC_VERSION_POS_FROM_END 823
 
 #define PIXART_RF_FW_HEADER_MAGIC 0x55AA55AA55AA55AA
 
@@ -97,6 +98,8 @@ fu_pxi_firmware_parse(FuFirmware *firmware,
 	guint32 version_raw = 0;
 	guint8 fw_header[PIXART_RF_FW_HEADER_SIZE];
 	guint8 model_name[FU_PXI_DEVICE_MODEL_NAME_LEN] = {0x0};
+	guint16 hpac_ver = 0;
+	g_autoptr(GByteArray) hpac_ver_buf = g_byte_array_new();
 	g_autofree gchar *version = NULL;
 
 	/* get fw header from buf */
@@ -130,10 +133,24 @@ fu_pxi_firmware_parse(FuFirmware *firmware,
 	fu_dump_raw(G_LOG_DOMAIN, "fw header", fw_header, sizeof(fw_header));
 
 	/* set fw version */
-	version_raw = (((guint32)(fw_header[0] - '0')) << 16) +
-		      (((guint32)(fw_header[2] - '0')) << 8) + (guint32)(fw_header[4] - '0');
+	if (fu_pxi_firmware_is_hpac(self)) {
+		if (!fu_memread_uint16_safe(buf,
+					    bufsz,
+					    bufsz - PIXART_RF_FW_HEADER_HPAC_VERSION_POS_FROM_END,
+					    &hpac_ver,
+					    G_BIG_ENDIAN,
+					    error))
+			return FALSE;
+		fu_pxi_hpac_version_info_parse(hpac_ver_buf, &hpac_ver);
+		version_raw = hpac_ver;
+		version = g_strndup((gchar *)hpac_ver_buf->data, hpac_ver_buf->len);
+	} else {
+		version_raw = (((guint32)(fw_header[0] - '0')) << 16) +
+			      (((guint32)(fw_header[2] - '0')) << 8) +
+			      (guint32)(fw_header[4] - '0');
+		version = fu_version_from_uint32(version_raw, FWUPD_VERSION_FORMAT_DELL_BIOS);
+	}
 	fu_firmware_set_version_raw(firmware, version_raw);
-	version = fu_version_from_uint32(version_raw, FWUPD_VERSION_FORMAT_DELL_BIOS);
 	fu_firmware_set_version(firmware, version);
 
 	/* set fw model name */
